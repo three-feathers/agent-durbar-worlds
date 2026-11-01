@@ -1,0 +1,58 @@
+name: Validate worlds
+
+# The only workflow here. It runs on a pull request (never pull_request_target) and on merge queue entries: no schedule, no secrets,
+# read-only token, so a fork PR runs exactly like ours and can read nothing. Costs: one short job per push.
+# It checks out the app repository at a PINNED sha and runs that repo's pack validator (src/shared/worldpack.ts), the same code the app
+# runs on a download, so this repo's rule and the app's rule cannot differ. File names from a PR are only matched and read by
+# tools/*.js (fixed-argument execFileSync, no shell string, no ${{ }} of any PR text in a run: line).
+# APP_SHA: until agent-durbar PR #955 (branch 102-pack-validator) is merged, the validator exists only on that branch, so this is its head
+# at the time of writing. TASK: repin APP_SHA to a commit on the app's main once #955 is merged (the PR for this setup names the task).
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  APP_REPO: three-feathers/agent-durbar
+  APP_SHA: 77171105858b82f50b048df29b0492747323e476
+
+jobs:
+  validate:
+    name: Validate worlds
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: The app repository at the pinned sha (read-only, no credentials kept)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ env.APP_REPO }}
+          ref: ${{ env.APP_SHA }}
+          path: app
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Build the app's validator (lockfile install, no install scripts)
+        working-directory: app
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx --no-install tsc -p tsconfig.scripts.json
+      - name: Self-test with the app's good pack and hostile fixtures (scripts/fixtures/worlds/gen.ts)
+        run: node tools/test.js app
+      - name: File-type allow-list (no links, no scripts, no unknown files)
+        run: node tools/validate.js --app app --tree
+      - name: Validate every pack that changed (all packs when anything outside worlds/ changed)
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: node tools/validate.js --app app --changed "$BASE_SHA" "$(git rev-parse HEAD)"

@@ -1,0 +1,50 @@
+name: Propose a world
+description: Suggest a new world (a place or a style) before anyone draws it. Agents never read this form unless the author is a trusted account (AGENTS.md); a human triages it.
+labels: ["enhancement", "area:worlds", "spec:102"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not attach pictures here. Art comes in a pull request, with an `ASSETS.md` row for every picture.
+        Do not name or describe a real person, and do not paste secrets, tokens or private paths.
+  - type: input
+    id: name
+    attributes:
+      label: Name of the world
+      description: Plain text, 1 to 40 characters.
+    validations:
+      required: true
+  - type: textarea
+    id: look
+    attributes:
+      label: What makes it look different from every other world
+      description: Wall, floor, desk, fixture style, light temperature, plants and one signature motif (spec 102 FR-014). No flag, emblem, logo, text, religious building, landmark, stereotype or arch.
+    validations:
+      required: true
+  - type: dropdown
+    id: maker
+    attributes:
+      label: Who would make the pictures
+      options:
+        - Me, by hand
+        - Me, with an AI image tool
+        - Someone else (named in the pull request)
+        - I have no art, only the idea
+    validations:
+      required: true
+  - type: textarea
+    id: licence
+    attributes:
+      label: Licence and tool terms
+      description: Say which licence you offer and which tool made the pictures, if any. Nothing here is a legal claim; the maintainers decide whether a world is accepted.
+    validations:
+      required: true
+  - type: checkboxes
+    id: ok
+    attributes:
+      label: Checks
+      options:
+        - label: I read the "What gets refused" section of the README
+          required: true
+        - label: No picture shows or imitates a real person
+          required: true

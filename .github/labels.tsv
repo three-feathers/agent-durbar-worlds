@@ -1,0 +1,15 @@
+# name<TAB>color<TAB>description. Applied by .github/scripts/sync-labels.sh (creates or updates; never deletes). Same families as the app repository.
+# One type (bug, enhancement, task, documentation, question; GitHub's defaults exist already), at least one area:*, spec:NNN, and flags only when true.
+task	1d76db	One task from a spec (a Tnnn line in the app repository's tasks.md)
+status:claimed	fbca04	Someone has claimed this (assignee set). Pick another issue.
+status:blocked	b60205	Blocked: see the comment for what is needed
+needs-owner-approval	d93f0b	Needs the maintainer's written yes first (purchase, release, account, settings)
+incident	e11d48	Confirmed user impact caused by a published release; not every bug
+docs-n/a	cfd3d7	PR with no docs impact
+area:worlds	c5def5	World packs under worlds/
+area:art	c5def5	Pictures, ASSETS.md, provenance, approvals
+area:ci	c5def5	Workflows, validation, repo settings
+area:docs	c5def5	README and docs
+area:security	c5def5	Hostile packs, secrets, scanning findings
+area:harness	c5def5	Agents, templates, labels, CODEOWNERS
+spec:102	0e8a16	Spec 102: worlds and character sets on demand
