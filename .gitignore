@@ -3,3 +3,4 @@ dist-scripts/
 app/
 *.zip
 .env
+trusted/

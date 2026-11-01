@@ -14,6 +14,10 @@ const MAX_ZIP_FILE = 12 * 1024 * 1024; // FR-081
 const ID_RE = /^[a-z0-9][a-z0-9_-]{0,38}$/;
 const PACK_FILE_RE = /^(world\.json|card\.json|ASSETS\.md|[a-z0-9][a-z0-9-]{0,40}\.webp)$/;
 const OWNERS = { world: ['vikramgorla'], crew: ['fjcabello'] }; // who may approve which kind (AGENTS.md)
+// Owners are known by first name in prose; Maker is compared as a login, so names are mapped first (like with like).
+const OWNER_LOGIN = { vikram: 'vikramgorla', paco: 'fjcabello', ruben: 'rubenlupi' };
+const LOGIN_RE = /^@?[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
+const asLogin = (v) => { const x = String(v).trim().replace(/^@/, '').toLowerCase(); return OWNER_LOGIN[x] || x; };
 const APPROVALS = ['pending', 'approved', 'refused'];
 const ASSET_COLUMNS = ['File', 'Kind', 'Tool and version', 'Date', 'Maker', 'Prompt', 'Processing', 'Licence', 'Approval', 'Approver', 'Approved on'];
 
@@ -81,6 +85,7 @@ function assetsProblems(text, pictures) {
     seen.add(f);
     if (!pictures.includes(f)) out.push(safe(f) + ': listed in ASSETS.md but not in the folder');
     if (o.Kind !== 'world' && o.Kind !== 'crew') out.push(safe(f) + ': Kind must be world or crew');
+    if (!LOGIN_RE.test(o.Maker)) out.push(safe(f) + ': Maker must be the GitHub login of the person responsible');
     for (const c of ['Tool and version', 'Date', 'Maker', 'Prompt', 'Processing', 'Licence']) if (!o[c] || /^(todo|tbd|\?|-)$/i.test(o[c])) out.push(safe(f) + ': ' + c + ' is empty');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(o.Date)) out.push(safe(f) + ': Date must be YYYY-MM-DD');
     if (!/\bno flag\b/i.test(o.Prompt)) out.push(safe(f) + ': the prompt lacks the exclusion clause (spec 102 FR-010)');
@@ -89,7 +94,7 @@ function assetsProblems(text, pictures) {
     if (o.Approval === 'approved') {
       const allowed = OWNERS[o.Kind] || [];
       if (!allowed.includes(o.Approver)) out.push(safe(f) + ': a ' + safe(o.Kind) + ' picture is approved by ' + allowed.join(' or ') + ' only');
-      if (o.Approver === o.Maker) out.push(safe(f) + ': the maker cannot approve their own picture');
+      if (asLogin(o.Approver) === asLogin(o.Maker)) out.push(safe(f) + ': the maker cannot approve their own picture');
       if (!/^\d{4}-\d{2}-\d{2}$/.test(o['Approved on'])) out.push(safe(f) + ': Approved on must be YYYY-MM-DD');
     }
   }
@@ -121,7 +126,11 @@ function loadValidator(appRoot) {
   const app = path.resolve(appRoot);
   const wp = require(path.join(app, 'dist-scripts', 'src', 'shared', 'worldpack.js'));
   const theme = require(path.join(app, 'src', 'renderer', 'theme.js'));
-  const knownSets = JSON.parse(fs.readFileSync(path.join(__dirname, 'known-sets.json'), 'utf8'));
+  // Set ids come from the pinned app, not from a list kept here: CHARACTER_CHOICES (src/shared/characters.ts) minus 'theme'.
+  // The app has no registry of downloadable or planned sets at that sha, so a world whose defaultSet is not in that list fails until the app has it.
+  const ch = require(path.join(app, 'dist-scripts', 'src', 'shared', 'characters.js'));
+  const knownSets = ch.CHARACTER_CHOICES.filter((c) => c !== 'theme');
+  if (!knownSets.length) throw new Error('no character sets found in the app');
   const opts = { clean: theme._tokens(), knownSets, requireHashes: false };
   return { wp, opts };
 }
@@ -150,4 +159,4 @@ function checkZipFile(file, v) {
   return r.ok ? [] : ['pack validator: ' + safe(r.reason)];
 }
 
-module.exports = { safe, pathProblem, treeProblems, parseAssets, assetsProblems, readPackDir, loadValidator, checkPackDir, checkZipFile, ID_RE, ASSET_COLUMNS };
+module.exports = { asLogin, safe, pathProblem, treeProblems, parseAssets, assetsProblems, readPackDir, loadValidator, checkPackDir, checkZipFile, ID_RE, ASSET_COLUMNS };

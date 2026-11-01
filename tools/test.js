@@ -26,7 +26,7 @@ const assetsText = (pics, o = {}, skip) => ['| ' + lib.ASSET_COLUMNS.join(' | ')
 function packDir(name, { mutate, assets = {}, skipRow } = {}) {
   const dir = path.join(tmp, name);
   fs.mkdirSync(dir, { recursive: true });
-  const files = gen.goodPack();
+  const files = gen.goodPack({ defaultSet: 'minimalist' });
   const pics = Object.keys(files).filter((f) => f.endsWith('.webp'));
   for (const f of Object.keys(files)) fs.writeFileSync(path.join(dir, f), files[f]);
   fs.writeFileSync(path.join(dir, 'ASSETS.md'), assetsText(pics, assets, skipRow));
@@ -47,6 +47,10 @@ const bad = (what, dir, re, id) => { const p = lib.checkPackDir(dir, id || path.
 bad('picture with no ASSETS row', packDir('no-row', { skipRow: 'wall.webp' }), /wall\.webp: no row/);
 bad('row without a picture', packDir('ghost-row', { mutate: (d) => fs.appendFileSync(path.join(d, 'ASSETS.md'), GOOD_ROW('ghost.webp') + '\n') }), /ghost\.webp: listed in ASSETS\.md but not/);
 bad('approved by the maker', packDir('self-approved', { assets: { Maker: 'vikramgorla' } }), /maker cannot approve/);
+bad('maker spelled as the owner\'s first name', packDir('self-name', { assets: { Kind: 'crew', Maker: 'Paco', Approver: 'fjcabello' } }), /maker cannot approve/);
+bad('maker spelled with @ and capitals', packDir('self-at', { assets: { Maker: '@VikramGorla' } }), /maker cannot approve/);
+bad('maker that is not a login', packDir('maker-text', { assets: { Maker: 'Paco and a robot' } }), /Maker must be/);
+{ const pr = lib.checkPackDir(packDir('other-maker', { assets: { Maker: 'someone-else' } }), 'test-world', v); assert.deepStrictEqual(pr, [], 'a different maker passes'); n++; }
 bad('crew art approved by Vikram, not Paco', packDir('crew-wrong', { assets: { Kind: 'crew' } }), /fjcabello only/);
 bad('approval refused', packDir('refused', { assets: { Approval: 'refused' } }), /approval is refused/);
 bad('unknown approval state', packDir('state', { assets: { Approval: 'ok' } }), /Approval must be/);
@@ -65,22 +69,27 @@ void linked;
 
 // ---- the file-type allow-list over a tree ----
 const T = (mode, p) => lib.treeProblems([{ mode, path: p }]).length > 0;
-for (const p of ['README.md', 'AGENTS.md', 'LICENSE', 'worlds/README.md', 'worlds/_template/ASSETS.md', 'worlds/spain/world.json', 'worlds/spain/wall.webp', 'worlds/spain/ASSETS.md', 'tools/validate.js', 'tools/known-sets.json', '.github/workflows/validate.yml', '.github/CODEOWNERS', '.github/dependabot.yml', '.github/ISSUE_TEMPLATE/propose-world.yml', '.github/scripts/sync-labels.sh', 'docs/notes.md']) ok('allowed: ' + p, !T('100644', p));
+for (const p of ['README.md', 'AGENTS.md', 'LICENSE', 'worlds/README.md', 'worlds/_template/ASSETS.md', 'worlds/spain/world.json', 'worlds/spain/wall.webp', 'worlds/spain/ASSETS.md', 'tools/validate.js', '.github/workflows/validate.yml', '.github/CODEOWNERS', '.github/dependabot.yml', '.github/ISSUE_TEMPLATE/propose-world.yml', '.github/scripts/sync-labels.sh', 'docs/notes.md']) ok('allowed: ' + p, !T('100644', p));
 for (const p of ['worlds/spain/run.js', 'worlds/spain/a.svg', 'worlds/spain/a.png', 'worlds/spain/x.html', 'worlds/spain/font.woff2', 'worlds/Spain/world.json', 'worlds/spain/sub/wall.webp', 'worlds/spain/..', 'worlds/../x', 'worlds/spain/wall.webp ', 'worlds/spain/wаll.webp', 'worlds/spain/a;b.webp', 'worlds/spain/$(id).webp', 'worlds/spain/a\nb.webp', 'worlds/stray.json', 'tools/x.sh', 'index.html', 'package.json', 'src/a.js', '.github/workflows/x.js', 'a\\b']) ok('refused: ' + JSON.stringify(p), T('100644', p));
 ok('a symlink is refused anywhere', T('120000', 'README.md'));
 ok('a submodule is refused', T('160000', 'tools/x.js'));
 ok('an executable under worlds/ is refused', T('100755', 'worlds/spain/wall.webp'));
 
 // ---- the app repository's good pack and hostile set, as zips ----
+// sets come from the app, not from a list here
+ok('set ids are read from the app', v.opts.knownSets.includes('minimalist') && !v.opts.knownSets.includes('theme'));
+bad('a world naming a set the app does not have', (() => { const d = packDir('unknown-set'); const m = JSON.parse(fs.readFileSync(path.join(d, 'world.json'), 'utf8')); m.defaultSet = 'retro-pixel'; fs.writeFileSync(path.join(d, 'world.json'), JSON.stringify(m)); return d; })(), /pack validator/);
+// the app's fixtures name the set 'office', which is not a character choice in the app: allow it for the zip fixtures only
+const vz = { ...v, opts: { ...v.opts, knownSets: [...v.opts.knownSets, 'office'] } };
 const gz = path.join(tmp, 'good.zip');
 fs.writeFileSync(gz, gen.toStored(gen.goodPack()));
-assert.deepStrictEqual(lib.checkZipFile(gz, v), [], 'the app fixture good.zip passes'); n++;
+assert.deepStrictEqual(lib.checkZipFile(gz, vz), [], 'the app fixture good.zip passes'); n++;
 const hostile = gen.hostileSet();
 ok('the hostile set has at least 30 packs', hostile.length >= 30);
 for (const h of hostile) {
   const f = path.join(tmp, 'bad-' + h.id + '.zip');
   fs.writeFileSync(f, h.zip);
-  ok('hostile zip refused: ' + h.id, lib.checkZipFile(f, v).length > 0);
+  ok('hostile zip refused: ' + h.id, lib.checkZipFile(f, vz).length > 0);
 }
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(n + ' checks passed');

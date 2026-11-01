@@ -5,6 +5,11 @@ name: Validate worlds
 # It checks out the app repository at a PINNED sha and runs that repo's pack validator (src/shared/worldpack.ts), the same code the app
 # runs on a download, so this repo's rule and the app's rule cannot differ. File names from a PR are only matched and read by
 # tools/*.js (fixed-argument execFileSync, no shell string, no ${{ }} of any PR text in a run: line).
+# The gate is NOT the PR's own copy: tools/ is taken from the BASE commit (main, or the merge queue's base) into ./trusted and run
+# against the PR's tree, so a PR (a fork's too) cannot weaken the checks it is judged by. A change to tools/ is judged by the current
+# tools and takes effect after merge; its own self-test also runs from the PR tree as a second signal, never as the gate.
+# Bootstrap: while the base has no tools/ yet (PR 1, which adds them), there is nothing older to trust; the step says so in the log and
+# owners read tools/ in that review. Once main has tools/, this fallback can never apply.
 # APP_SHA: until agent-durbar PR #955 (branch 102-pack-validator) is merged, the validator exists only on that branch, so this is its head
 # at the time of writing. TASK: repin APP_SHA to a commit on the app's main once #955 is merged (the PR for this setup names the task).
 on:
@@ -33,6 +38,12 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: The checks from the base commit (not from this PR)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          path: trusted
+          persist-credentials: false
       - name: The app repository at the pinned sha (read-only, no credentials kept)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -48,11 +59,22 @@ jobs:
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
           npx --no-install tsc -p tsconfig.scripts.json
-      - name: Self-test with the app's good pack and hostile fixtures (scripts/fixtures/worlds/gen.ts)
+      - name: Choose the checks (base commit; this PR's own only while the base has none)
+        run: |
+          if [ -f trusted/tools/validate.js ]; then
+            echo "TOOLS=$GITHUB_WORKSPACE/trusted/tools" >> "$GITHUB_ENV"
+          else
+            echo "::warning::Bootstrap: the base commit has no tools/ yet, so this PR's own copy is used. Owners must read tools/ in review."
+            echo "TOOLS=$GITHUB_WORKSPACE/tools" >> "$GITHUB_ENV"
+          fi
+      - name: Self-test of the checks with the app's good pack and hostile fixtures (scripts/fixtures/worlds/gen.ts)
+        run: node "$TOOLS/test.js" app
+      - name: Self-test of this PR's own tools/ (second signal, not the gate)
+        if: ${{ hashFiles('tools/test.js') != '' }}
         run: node tools/test.js app
       - name: File-type allow-list (no links, no scripts, no unknown files)
-        run: node tools/validate.js --app app --tree
+        run: node "$TOOLS/validate.js" --app app --tree
       - name: Validate every pack that changed (all packs when anything outside worlds/ changed)
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
-        run: node tools/validate.js --app app --changed "$BASE_SHA" "$(git rev-parse HEAD)"
+        run: node "$TOOLS/validate.js" --app app --changed "$BASE_SHA" "$(git rev-parse HEAD)"
