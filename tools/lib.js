@@ -126,10 +126,14 @@ function loadValidator(appRoot) {
   const app = path.resolve(appRoot);
   const wp = require(path.join(app, 'dist-scripts', 'src', 'shared', 'worldpack.js'));
   const theme = require(path.join(app, 'src', 'renderer', 'theme.js'));
-  // Set ids come from the pinned app, not from a list kept here: CHARACTER_CHOICES (src/shared/characters.ts) minus 'theme'.
-  // The app has no registry of downloadable or planned sets at that sha, so a world whose defaultSet is not in that list fails until the app has it.
+  // Set ids come from the pinned app, from two places and no list kept here: CHARACTER_CHOICES minus 'theme' (src/shared/characters.ts, compiled
+  // by the CI build) and REAL_OFFICE_SETS (src/renderer/crew.js, the Office people). crew.js is the pinned app's reviewed UMD file: a plain
+  // require() in Node exports its API object (no DOM, no storage, no network, no file access at load); it is the same code the app's own
+  // scripts/test-crew.ts requires. We read one array from it and keep nothing else.
   const ch = require(path.join(app, 'dist-scripts', 'src', 'shared', 'characters.js'));
-  const knownSets = ch.CHARACTER_CHOICES.filter((c) => c !== 'theme');
+  const crew = require(path.join(app, 'src', 'renderer', 'crew.js'));
+  if (!Array.isArray(crew.REAL_OFFICE_SETS)) throw new Error('REAL_OFFICE_SETS not found in the app');
+  const knownSets = [...new Set([...ch.CHARACTER_CHOICES.filter((c) => c !== 'theme'), ...crew.REAL_OFFICE_SETS])];
   if (!knownSets.length) throw new Error('no character sets found in the app');
   const opts = { clean: theme._tokens(), knownSets, requireHashes: false };
   return { wp, opts };

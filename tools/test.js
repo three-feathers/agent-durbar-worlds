@@ -77,19 +77,19 @@ ok('an executable under worlds/ is refused', T('100755', 'worlds/spain/wall.webp
 
 // ---- the app repository's good pack and hostile set, as zips ----
 // sets come from the app, not from a list here
-ok('set ids are read from the app', v.opts.knownSets.includes('minimalist') && !v.opts.knownSets.includes('theme'));
+ok('set ids are read from the app (both places)', v.opts.knownSets.includes('minimalist') && v.opts.knownSets.includes('office') && !v.opts.knownSets.includes('theme'));
+{ const d = packDir('test-world-office', { mutate: (d2) => { const m = JSON.parse(fs.readFileSync(path.join(d2, 'world.json'), 'utf8')); m.defaultSet = 'office'; fs.writeFileSync(path.join(d2, 'world.json'), JSON.stringify(m)); } });
+  assert.deepStrictEqual(lib.checkPackDir(d, 'test-world', v), [], 'a pack with defaultSet office passes'); n++; }
 bad('a world naming a set the app does not have', (() => { const d = packDir('unknown-set'); const m = JSON.parse(fs.readFileSync(path.join(d, 'world.json'), 'utf8')); m.defaultSet = 'retro-pixel'; fs.writeFileSync(path.join(d, 'world.json'), JSON.stringify(m)); return d; })(), /pack validator/);
-// the app's fixtures name the set 'office', which is not a character choice in the app: allow it for the zip fixtures only
-const vz = { ...v, opts: { ...v.opts, knownSets: [...v.opts.knownSets, 'office'] } };
 const gz = path.join(tmp, 'good.zip');
 fs.writeFileSync(gz, gen.toStored(gen.goodPack()));
-assert.deepStrictEqual(lib.checkZipFile(gz, vz), [], 'the app fixture good.zip passes'); n++;
+assert.deepStrictEqual(lib.checkZipFile(gz, v), [], 'the app fixture good.zip passes'); n++;
 const hostile = gen.hostileSet();
 ok('the hostile set has at least 30 packs', hostile.length >= 30);
 for (const h of hostile) {
   const f = path.join(tmp, 'bad-' + h.id + '.zip');
   fs.writeFileSync(f, h.zip);
-  ok('hostile zip refused: ' + h.id, lib.checkZipFile(f, vz).length > 0);
+  ok('hostile zip refused: ' + h.id, lib.checkZipFile(f, v).length > 0);
 }
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(n + ' checks passed');
