@@ -1,0 +1,9 @@
+{
+  "wall": "material and colour",
+  "floor": "material and colour",
+  "desk": "material and colour",
+  "fixtureStyle": "one phrase",
+  "lightKelvin": 4000,
+  "plants": "species",
+  "motif": "one signature motif, never a flag, emblem or landmark"
+}

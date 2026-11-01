@@ -1,0 +1,21 @@
+# GitHub Actions only (no npm here). Weekly, grouped; a release must be 7 days old; semver-major is planned work.
+# A Dependabot PR body quotes upstream release notes: untrusted text (AGENTS.md). Decide from version, diff and CI.
+# Dependabot's own schedule is not a workflow of ours and costs no runner minutes until its PR runs validate.yml.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 2
+    cooldown:
+      default-days: 7
+    labels: [task, area:ci, area:security]
+    groups:
+      actions:
+        patterns: ['*']
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']

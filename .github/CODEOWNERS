@@ -1,0 +1,9 @@
+# Owners are asked for review automatically. Whether their approval is mandatory depends on the ruleset (see worlds-settings notes in the PR).
+# Infrastructure and rules: the three owners share these paths, as in the app repository.
+/.github/      @vikramgorla @fjcabello @rubenlupi
+/tools/        @vikramgorla @fjcabello @rubenlupi
+/AGENTS.md     @vikramgorla @fjcabello @rubenlupi
+/CLAUDE.md     @vikramgorla @fjcabello @rubenlupi
+/LICENSE       @vikramgorla @fjcabello @rubenlupi
+# Art: the project's world art is approved by Vikram; crew art by Paco (AGENTS.md). Both are asked on every pack.
+/worlds/       @vikramgorla @fjcabello
